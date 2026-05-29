@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AeroTrack — Панель управления арендным оборудованием</title>
+    
+    <!-- Google Fonts: Outfit & Space Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Leaflet Map CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fa-solid fa-satellite-dish pulse-logo"></i>
+                    <span>AeroTrack</span>
+                </div>
+                <div class="badge">MVP</div>
+            </div>
+            
+            <div class="search-bar">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="device-search" placeholder="Поиск устройств...">
+            </div>
+            
+            <div class="device-section">
+                <h3>Устройства в сети (<span id="device-count">0</span>)</h3>
+                <div class="device-list" id="device-list-container">
+                    <div class="empty-list-message">Загрузка устройств...</div>
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="avatar"><i class="fa-solid fa-user-shield"></i></div>
+                    <div class="profile-info">
+                        <span class="user-name">Администратор</span>
+                        <span class="user-role">Контроль доступа</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN DASHBOARD CONTENT -->
+        <main class="dashboard-main">
+            
+            <!-- HEADER -->
+            <header class="dashboard-header">
+                <div class="welcome-text">
+                    <h1 id="selected-device-title">Выберите устройство</h1>
+                    <p id="selected-device-status-desc">Панель управления оборудованием в реальном времени</p>
+                </div>
+                <div class="system-stats">
+                    <div class="stat-pill">
+                        <span class="indicator green"></span>
+                        <span class="pill-text">API: Онлайн</span>
+                    </div>
+                    <div class="stat-pill" id="db-status">
+                        <span class="indicator green"></span>
+                        <span class="pill-text">DB: Соединение установлено</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- NO DEVICE SELECTED STATE -->
+            <div id="no-device-selected" class="no-selection-card">
+                <i class="fa-solid fa-compass-drafting animate-float"></i>
+                <h2>Добро пожаловать в AeroTrack</h2>
+                <p>Пожалуйста, выберите устройство из списка слева для просмотра его геолокации, показателей телеметрии и отправки управляющих команд.</p>
+            </div>
+
+            <!-- ACTIVE DASHBOARD VIEW (HIDDEN BY DEFAULT) -->
+            <div id="active-dashboard" class="dashboard-layout" style="display: none;">
+                
+                <!-- ROW 1: METRICS GRID -->
+                <div class="metrics-grid">
+                    
+                    <!-- BATTERY CARD -->
+                    <div class="metric-card" id="card-battery">
+                        <div class="card-header">
+                            <span>Заряд батареи</span>
+                            <i class="fa-solid fa-battery-three-quarters icon"></i>
+                        </div>
+                        <div class="card-value">
+                            <span id="metric-battery-val">--</span><span class="unit">%</span>
+                        </div>
+                        <div class="battery-progress-container">
+                            <div class="battery-progress-bar" id="battery-progress"></div>
+                        </div>
+                        <div class="card-subtext" id="metric-battery-sub">--</div>
+                    </div>
+
+                    <!-- POWER STATUS CARD -->
+                    <div class="metric-card" id="card-power">
+                        <div class="card-header">
+                            <span>Статус питания</span>
+                            <i class="fa-solid fa-plug icon"></i>
+                        </div>
+                        <div class="card-value-small" id="metric-power-source">
+                            --
+                        </div>
+                        <div class="card-subtext" id="metric-charging-status">
+                            --
+                        </div>
+                    </div>
+
+                    <!-- RELAY STATE CARD -->
+                    <div class="metric-card" id="card-relay">
+                        <div class="card-header">
+                            <span>Состояние реле</span>
+                            <i class="fa-solid fa-toggle-on icon"></i>
+                        </div>
+                        <div class="relay-display-wrapper">
+                            <div class="relay-badge" id="relay-status-badge">--</div>
+                        </div>
+                        <div class="card-subtext" id="metric-relay-sub">Управление подачей питания</div>
+                    </div>
+
+                    <!-- SIGNAL STRENGTH CARD -->
+                    <div class="metric-card" id="card-rssi">
+                        <div class="card-header">
+                            <span>Уровень сигнала (RSSI)</span>
+                            <i class="fa-solid fa-wifi icon"></i>
+                        </div>
+                        <div class="card-value">
+                            <span id="metric-rssi-val">--</span><span class="unit"> dBm</span>
+                        </div>
+                        <div class="signal-strength-indicator">
+                            <div class="signal-bar" id="sig-1"></div>
+                            <div class="signal-bar" id="sig-2"></div>
+                            <div class="signal-bar" id="sig-3"></div>
+                            <div class="signal-bar" id="sig-4"></div>
+                            <div class="signal-bar" id="sig-5"></div>
+                        </div>
+                        <div class="card-subtext" id="metric-cell-info">MCC: -- | MNC: --</div>
+                    </div>
+
+                    <!-- VELOCITY CARD -->
+                    <div class="metric-card" id="card-speed">
+                        <div class="card-header">
+                            <span>Текущая скорость</span>
+                            <i class="fa-solid fa-gauge-high icon"></i>
+                        </div>
+                        <div class="card-value">
+                            <span id="metric-speed-val">--</span><span class="unit"> км/ч</span>
+                        </div>
+                        <div class="card-subtext" id="metric-accuracy-val">Точность GPS: -- м</div>
+                    </div>
+
+                    <!-- HYDROGEN & OPERATING MODE -->
+                    <div class="metric-card" id="card-payload">
+                        <div class="card-header">
+                            <span>Состояние оборудования</span>
+                            <i class="fa-solid fa-microchip icon"></i>
+                        </div>
+                        <div class="payload-grid">
+                            <div class="payload-item">
+                                <span class="lbl">H₂ (PPM)</span>
+                                <span class="val" id="metric-hydrogen">--</span>
+                            </div>
+                            <div class="payload-item">
+                                <span class="lbl">Моточасы</span>
+                                <span class="val" id="metric-hours">--</span>
+                            </div>
+                        </div>
+                        <div class="card-subtext" id="metric-opmode">Режим: --</div>
+                    </div>
+                </div>
+
+                <!-- ROW 2: MAP & CONTROLS -->
+                <div class="visual-grid">
+                    
+                    <!-- MAP CONTAINER -->
+                    <div class="map-card">
+                        <div class="card-header-actions">
+                            <h3><i class="fa-solid fa-map-location-dot"></i> Карта местоположения</h3>
+                            <div class="map-toggles">
+                                <button class="btn btn-secondary btn-xs" id="btn-fit-map" title="Показать всё устройство на карте">
+                                    <i class="fa-solid fa-crosshairs"></i> Центрировать
+                                </button>
+                            </div>
+                        </div>
+                        <div id="map"></div>
+                    </div>
+
+                    <!-- CONTROLS & COMMANDS PANEL -->
+                    <div class="controls-card">
+                        <h3><i class="fa-solid fa-sliders"></i> Панель управления</h3>
+                        
+                        <!-- RELAY SWITCH -->
+                        <div class="control-group">
+                            <label class="control-label">Реле питания устройства</label>
+                            <p class="control-description">Управление нагрузкой арендного оборудования. Команда отправляется в очередь и применится при следующем сеансе связи.</p>
+                            <div class="power-toggle-wrapper">
+                                <button class="btn-power-switch" id="btn-relay-on">
+                                    <i class="fa-solid fa-power-off"></i> Включить
+                                </button>
+                                <button class="btn-power-switch" id="btn-relay-off">
+                                    <i class="fa-solid fa-power-off"></i> Выключить
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- INTERVAL SELECTOR -->
+                        <div class="control-group">
+                            <label class="control-label" for="select-interval">Интервал отправки данных</label>
+                            <p class="control-description">Изменить частоту отправки телеметрии устройством.</p>
+                            <div class="input-inline">
+                                <select id="select-interval" class="form-select">
+                                    <option value="5">5 секунд (Тест)</option>
+                                    <option value="10">10 секунд</option>
+                                    <option value="15">15 секунд</option>
+                                    <option value="30">30 секунд</option>
+                                    <option value="60">60 секунд (1 мин)</option>
+                                    <option value="300">300 секунд (5 мин)</option>
+                                </select>
+                                <button class="btn btn-primary" id="btn-send-interval">Отправить</button>
+                            </div>
+                        </div>
+
+                        <!-- COMMAND QUEUE LOG -->
+                        <div class="commands-log-container">
+                            <label class="control-label">История отправленных команд</label>
+                            <div class="commands-table-wrapper">
+                                <table class="commands-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Тип</th>
+                                            <th>Значение</th>
+                                            <th>Статус</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="commands-log-body">
+                                        <tr>
+                                            <td colspan="4" class="text-muted text-center">Нет отправленных команд</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ROW 3: HISTORY & RAW DATA INSPECTOR -->
+                <div class="details-grid">
+                    
+                    <!-- RECENT TELEMETRY HISTORY LIST -->
+                    <div class="details-card">
+                        <div class="card-header-actions">
+                            <h3><i class="fa-solid fa-clock-rotate-left"></i> История телеметрии (Последние 5)</h3>
+                            <button class="btn btn-secondary btn-sm" id="btn-refresh-history" title="Обновить историю">
+                                <i class="fa-solid fa-arrows-rotate"></i> Обновить
+                            </button>
+                        </div>
+                        <p class="control-description">Последние полученные сервером пакеты данных, сохраненные в базе.</p>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Время записи</th>
+                                        <th>Координаты</th>
+                                        <th>Батарея</th>
+                                        <th>Зарядка</th>
+                                        <th>Реле</th>
+                                        <th>Скорость</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="telemetry-history-rows">
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">Загрузка истории...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- RAW TELEMETRY JSON INSPECTOR -->
+                    <div class="details-card">
+                        <div class="card-header-actions">
+                            <h3><i class="fa-solid fa-code"></i> RAW JSON инспектор телеметрии</h3>
+                            <button class="btn btn-secondary btn-sm" id="btn-copy-raw" title="Копировать в буфер обмена">
+                                <i class="fa-regular fa-copy"></i> Копировать
+                            </button>
+                        </div>
+                        <p class="control-description">Последний сырой JSON-пакет телеметрии, полученный сервером от устройства.</p>
+                        <div class="raw-json-wrapper">
+                            <pre><code id="raw-json-viewer">{ "message": "Ожидание данных от устройства..." }</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Leaflet Map JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Custom Application Logic -->
+    <script src="app.js"></script>
+</body>
+</html>

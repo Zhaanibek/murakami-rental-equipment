@@ -1,0 +1,70 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: rental_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    networks:
+      - rental_network
+
+  backend:
+    build: ./backend
+    container_name: rental_backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      BACKEND_HOST: ${BACKEND_HOST}
+      BACKEND_PORT: ${BACKEND_PORT}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - rental_network
+
+  frontend:
+    build: ./frontend
+    container_name: rental_frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    networks:
+      - rental_network
+
+  simulator:
+    build: ./simulator
+    container_name: rental_simulator
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      SERVER_URL: http://backend:8000
+      DEVICE_ID: velo_almaty_001
+    networks:
+      - rental_network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  rental_network:
+    driver: bridge
